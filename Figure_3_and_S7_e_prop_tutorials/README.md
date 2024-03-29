@@ -31,3 +31,13 @@ When running the hardcoded implementation of e-prop on a GPU and encountering an
 <img src="./figures/evidence_acc_training.png"
      alt="Raster plot"
      style="width: 200;" />
+
+# Generate references for e-prop in NEST
+
+Run the following commands to simulate the references for e-prop in the NEST simulator.
+
+```
+cd Figure_3_and_S7_e_prop_tutorials
+python tutorial_evidence_accumulation_with_alif.py --n_batch=1 --n_iter=5 --eprop --feedback=random
+python tutorial_pattern_generation.py --n_iter=5 --print_every=1
+```
