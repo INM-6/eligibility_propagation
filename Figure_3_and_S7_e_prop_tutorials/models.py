@@ -140,7 +140,7 @@ class LightLIF(Cell):
         # update the voltage
         i_t = tf.matmul(inputs, self.w_in_val) + tf.matmul(z, self.w_rec_val)
         I_reset = z * self.thr * self.dt
-        new_v = decay * v + (1 - decay) * i_t - I_reset
+        new_v = decay * v + i_t - I_reset
 
         # Spike generation
         v_scaled = (new_v - thr) / thr
