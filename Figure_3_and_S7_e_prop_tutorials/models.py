@@ -211,7 +211,7 @@ class LightALIF(LightLIF):
 EligALIFStateTuple = namedtuple('EligALIFStateTuple', ('s', 'z', 'z_local', 'r'))
 
 class EligALIF():
-    def __init__(self, n_in, n_rec, tau=20., thr=0.03, dt=1., dtype=tf.float32, dampening_factor=0.3,
+    def __init__(self, random_state, n_in, n_rec, tau=20., thr=0.03, dt=1., dtype=tf.float32, dampening_factor=0.3,
                  tau_adaptation=200., beta=1.6,
                  stop_z_gradients=False, n_refractory=1):
 
@@ -243,11 +243,11 @@ class EligALIF():
         self.thr = thr
 
         with tf.variable_scope('InputWeights'):
-            self.w_in_var = tf.Variable(np.random.randn(n_in, n_rec) / np.sqrt(n_in), dtype=dtype)
+            self.w_in_var = tf.Variable(random_state.randn(n_in, n_rec) / np.sqrt(n_in), dtype=dtype)
             self.w_in_val = tf.identity(self.w_in_var)
 
         with tf.variable_scope('RecWeights'):
-            self.w_rec_var = tf.Variable(np.random.randn(n_rec, n_rec) / np.sqrt(n_rec), dtype=dtype)
+            self.w_rec_var = tf.Variable(random_state.randn(n_rec, n_rec) / np.sqrt(n_rec), dtype=dtype)
             self.recurrent_disconnect_mask = np.diag(np.ones(n_rec, dtype=bool))
             self.w_rec_val = tf.where(self.recurrent_disconnect_mask, tf.zeros_like(self.w_rec_var),
                                       self.w_rec_var)  # Disconnect self-connection

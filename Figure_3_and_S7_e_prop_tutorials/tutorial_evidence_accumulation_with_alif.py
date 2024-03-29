@@ -7,10 +7,13 @@ import socket
 from time import time
 import matplotlib.pyplot as plt
 import numpy as np
-import numpy.random as rd
 import tensorflow as tf
 from tools import update_plot, generate_click_task_data
 from models import EligALIF, exp_convolve
+
+random_state_1 = np.random.RandomState(seed=1)
+random_state_2 = np.random.RandomState(seed=2)
+freezing_seed = None
 
 FLAGS = tf.app.flags.FLAGS
 start_time = datetime.datetime.now()
@@ -64,13 +67,13 @@ decay = np.exp(-FLAGS.dt / FLAGS.tau_out)  # output layer filtered_z decay, chos
 
 n_in = 40
 
-def get_data_dict(batch_size):
+def get_data_dict(random_state, batch_size):
     # used for obtaining a new randomly generated batch of examples
     seq_len = int(t_cue_spacing * 7 + 1200)
     spk_data, in_nums, target_data, _ = \
-        generate_click_task_data(batch_size=batch_size, seq_len=seq_len, n_neuron=n_in, recall_duration=150,
+        generate_click_task_data(random_state=random_state, batch_size=batch_size, seq_len=seq_len, n_neuron=n_in, recall_duration=150,
                                  p_group=0.3, t_cue=100, n_cues=7, t_interval=t_cue_spacing, f0=input_f0,
-                                 n_input_symbols=4)
+                                 n_input_symbols=4, freezing_seed=freezing_seed)
     return {input_spikes: spk_data, input_nums: in_nums, target_nums: target_data}
 
 
@@ -87,9 +90,16 @@ with tf.variable_scope('CellDefinition'):
     beta_a = 1.7 * (1 - rhos) / (1 - np.exp(-1 / FLAGS.tau_v))  # this is a heuristic value
     beta = np.concatenate([np.zeros(n_regular), beta_a * np.ones(n_adaptive)])  # multiplicative factors for adaptive threshold
     # Generate the cell
-    cell = EligALIF(n_in=n_in, n_rec=n_regular + n_adaptive, tau=tau_v, beta=beta, thr=thr,
+    cell = EligALIF(random_state=random_state_1, n_in=n_in, n_rec=n_regular + n_adaptive, tau=tau_v, beta=beta, thr=thr,
                     dt=FLAGS.dt, tau_adaptation=tau_a, dampening_factor=FLAGS.dampening_factor,
                     stop_z_gradients=FLAGS.eprop, n_refractory=FLAGS.n_ref)
+
+    # the same as tf.get_variable which by default initializes with the Glorot distribution
+    glorot_scale = 1. / max(1., (n_neurons + 2) / 2.)
+    glorot_limit = np.sqrt(3. * glorot_scale)
+    W_out = tf.Variable(random_state_1.uniform(-glorot_limit, glorot_limit, (n_neurons, 2)), dtype=tf.float32)
+
+    b_out_vals = random_state_1.randn(n_regular + n_adaptive, 2)
 
 with tf.name_scope('SimulateNetwork'):
     outputs, final_state = tf.nn.dynamic_rnn(cell, input_spikes, dtype=tf.float32)
@@ -98,7 +108,6 @@ with tf.name_scope('SimulateNetwork'):
     v, b = s[..., 0], s[..., 1]
 
 with tf.name_scope('OutputComputation'):
-    W_out = tf.get_variable(name='out_weight', shape=[n_regular + n_adaptive, 2])
     filtered_z = exp_convolve(z, decay)
 
     if FLAGS.eprop and FLAGS.feedback == 'random':
@@ -116,7 +125,6 @@ with tf.name_scope('OutputComputation'):
             return logits, grad
 
         # generate random feedback matrix
-        b_out_vals = rd.randn(n_regular + n_adaptive, 2)
         B_out = tf.constant(b_out_vals, dtype=tf.float32, name='feedback_weights')
         out = matmul_random_feedback(filtered_z, W_out, B_out)
     else:
@@ -272,7 +280,7 @@ for k_iter in range(FLAGS.n_iter):
     # Monitor the training with a validation set
     if np.mod(k_iter, FLAGS.validate_every) == 0:
         t0 = time()
-        val_dict = get_data_dict(FLAGS.n_batch)
+        val_dict = get_data_dict(random_state_2, FLAGS.n_batch)
         results_values = sess.run(results_tensors, feed_dict=val_dict)
         validation_loss_list.append(results_values['loss_recall'])
         validation_error_list.append(results_values['recall_errors'])
@@ -334,7 +342,7 @@ for k_iter in range(FLAGS.n_iter):
         early_stopping_list = []
         t_es_0 = time()
         for i in range(8):
-            val_dict = get_data_dict(FLAGS.n_batch)
+            val_dict = get_data_dict(random_state_2, FLAGS.n_batch)
             early_stopping_list.append(sess.run(results_tensors['recall_errors'], feed_dict=val_dict))
         t_es = time() - t_es_0
         print("comput. time (s): early stopping: " + str(t_es))
@@ -351,7 +359,7 @@ for k_iter in range(FLAGS.n_iter):
         break
 
     # do train step
-    train_dict = get_data_dict(FLAGS.n_batch)
+    train_dict = get_data_dict(random_state_1, FLAGS.n_batch)
     t0 = time()
     sess.run(train_step, feed_dict=train_dict)
     t_train = time() - t0
@@ -372,7 +380,7 @@ results = {
 # Save sample trajectory (input, output, etc. for plotting) and test final performance
 test_errors = []
 for i in range(4):
-    test_dict = get_data_dict(FLAGS.n_batch)
+    test_dict = get_data_dict(random_state_1, FLAGS.n_batch)
     results_values, plot_results_values, in_spk, spk, target_nums_np = sess.run(
         [results_tensors, plot_result_tensors, input_spikes, z, target_nums],
         feed_dict=test_dict)

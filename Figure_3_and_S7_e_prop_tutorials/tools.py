@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 from matplotlib import patches
 import numpy as np
-import numpy.random as rd
 import json
 
 class NumpyAwareEncoder(json.JSONEncoder):
@@ -40,29 +39,29 @@ def strip_right_top_axis(ax):
 
 
 
-def generate_poisson_noise_np(prob_pattern, freezing_seed=None):
+def generate_poisson_noise_np(random_state, prob_pattern, freezing_seed=None):
     if isinstance(prob_pattern, list):
         return [generate_poisson_noise_np(pb, freezing_seed=freezing_seed) for pb in prob_pattern]
 
     shp = prob_pattern.shape
 
-    if not(freezing_seed is None): rng = rd.RandomState(freezing_seed)
-    else: rng = rd.RandomState()
+    if freezing_seed is not None:
+        random_state.seed(freezing_seed)
 
-    spikes = prob_pattern > rng.rand(prob_pattern.size).reshape(shp)
+    spikes = prob_pattern > random_state.rand(prob_pattern.size).reshape(shp)
     return spikes
 
 
 
-def generate_click_task_data(batch_size, seq_len, n_neuron, recall_duration, p_group, f0=0.5,
+def generate_click_task_data(random_state, batch_size, seq_len, n_neuron, recall_duration, p_group, f0=0.5,
                              n_cues=7, t_cue=100, t_interval=150,
-                             n_input_symbols=4):
+                             n_input_symbols=4, freezing_seed=None):
     t_seq = seq_len
     n_channel = n_neuron // n_input_symbols
 
     # randomly assign group A and B
     prob_choices = np.array([p_group, 1 - p_group], dtype=np.float32)
-    idx = rd.choice([0, 1], batch_size)
+    idx = random_state.choice([0, 1], batch_size)
     probs = np.zeros((batch_size, 2), dtype=np.float32)
     # assign input spike probabilities
     probs[:, 0] = prob_choices[idx]
@@ -71,7 +70,7 @@ def generate_click_task_data(batch_size, seq_len, n_neuron, recall_duration, p_g
     cue_assignments = np.zeros((batch_size, n_cues), dtype=np.int)
     # for each example in batch, draw which cues are going to be active (left or right)
     for b in range(batch_size):
-        cue_assignments[b, :] = rd.choice([0, 1], n_cues, p=probs[b])
+        cue_assignments[b, :] = random_state.choice([0, 1], n_cues, p=probs[b])
 
     # generate input nums - 0: left, 1: right, 2:recall, 3:background noise
     input_nums = 3*np.ones((batch_size, seq_len), dtype=np.int)
@@ -94,7 +93,7 @@ def generate_click_task_data(batch_size, seq_len, n_neuron, recall_duration, p_g
     input_spike_prob[:, -recall_duration:, 2*n_channel:3*n_channel] = f0
     # background noise
     input_spike_prob[:, :, 3*n_channel:] = f0/4.
-    input_spikes = generate_poisson_noise_np(input_spike_prob)
+    input_spikes = generate_poisson_noise_np(random_state, input_spike_prob, freezing_seed)
 
     # generate targets
     target_mask = np.zeros((batch_size, seq_len), dtype=np.bool)

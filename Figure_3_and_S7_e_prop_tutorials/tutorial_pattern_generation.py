@@ -4,12 +4,13 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
-import numpy.random as rd
 import tensorflow as tf
 from time import time
 
 from models import exp_convolve, LightLIF, pseudo_derivative, shift_by_one_time_step, check_gradients, \
     sum_of_sines_target
+
+np.random.seed(seed=1)
 
 FLAGS = tf.app.flags.FLAGS
 ##
@@ -54,6 +55,9 @@ cell = LightLIF(n_in=FLAGS.n_in, n_rec=FLAGS.n_rec, tau=tau_m, thr=thr, dt=dt,
                 dampening_factor=FLAGS.dampening_factor,
                 stop_z_gradients=FLAGS.stop_z_gradients)
 
+wout_val = np.random.randn(FLAGS.n_rec, FLAGS.n_out) / np.sqrt(FLAGS.n_rec)
+B_random_val = np.random.randn(FLAGS.n_rec, FLAGS.n_out) / np.sqrt(FLAGS.n_rec)
+
 # build the input pattern
 frozen_poisson_noise_input = np.random.rand(FLAGS.n_batch, FLAGS.seq_len, FLAGS.n_in) < dt * input_f0
 input_spikes = tf.constant(frozen_poisson_noise_input, dtype=tf.float32)
@@ -68,7 +72,7 @@ outs, final_state = tf.nn.dynamic_rnn(cell, input_spikes, dtype=tf.float32)
 z, v = outs
 
 with tf.name_scope('RecallLoss'):
-    w_out = tf.Variable(np.random.randn(FLAGS.n_rec, FLAGS.n_out) / np.sqrt(FLAGS.n_rec),
+    w_out = tf.Variable(wout_val,
                         name='out_weight',
                         dtype=tf.float32)
 
@@ -117,7 +121,7 @@ with tf.name_scope('E-prop'):
     eligibility_traces_averaged_w_rec = tf.reduce_mean(eligibility_traces_w_rec, axis=(0, 1))
 
     if FLAGS.random_feedback:
-        B_random = tf.constant(np.random.randn(FLAGS.n_rec, FLAGS.n_out) / np.sqrt(FLAGS.n_rec), dtype=tf.float32)
+        B_random = tf.constant(B_random_val, dtype=tf.float32)
     else:
         B_random = w_out # better performance is obtained with the true error feed-backs
     learning_signals = tf.einsum('btk,jk->btj', output_error, B_random)
