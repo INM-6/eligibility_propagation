@@ -175,7 +175,7 @@ with tf.name_scope('OptimizationScheme'):
         # For Cross entropy loss as in classification:
         # learning_signal_j(t) = sum_k B_kj (pi*_k(t) - pi_k(t))
         learning_signal_classification = tf.gradients(loss_cls, filtered_z)[0]
-        learning_signal_regularization = tf.gradients(loss_reg_f, filtered_z)[0]
+        learning_signal_regularization = tf.gradients(loss_reg_f, z)[0]
         learning_signal = learning_signal_classification + learning_signal_regularization
 
         # e-traces for input synapses
