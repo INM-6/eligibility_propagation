@@ -49,6 +49,7 @@ assert FLAGS.feedback in ['random', 'symmetric']
 
 # Experiment parameters
 t_cue_spacing = 150  # distance between two consecutive cues in ms
+recall_duration = 150
 
 # Frequencies
 input_f0 = 40. / 1000.  # poisson firing rate of input neurons in khz
@@ -68,7 +69,7 @@ def get_data_dict(batch_size):
     # used for obtaining a new randomly generated batch of examples
     seq_len = int(t_cue_spacing * 7 + 1200)
     spk_data, in_nums, target_data, _ = \
-        generate_click_task_data(batch_size=batch_size, seq_len=seq_len, n_neuron=n_in, recall_duration=150,
+        generate_click_task_data(batch_size=batch_size, seq_len=seq_len, n_neuron=n_in, recall_duration=recall_duration,
                                  p_group=0.3, t_cue=100, n_cues=7, t_interval=t_cue_spacing, f0=input_f0,
                                  n_input_symbols=4)
     return {input_spikes: spk_data, input_nums: in_nums, target_nums: target_data}
@@ -123,10 +124,10 @@ with tf.name_scope('OutputComputation'):
         out = tf.einsum('btj,jk->btk', filtered_z, W_out)
 
     # we only use network output at the end for classification
-    output_logits = out[:, -t_cue_spacing:]
+    output_logits = out[:, -recall_duration:]
 
 with tf.name_scope('TaskLoss'):
-    tiled_targets = tf.tile(target_nums[:, np.newaxis, -1], (1, t_cue_spacing))
+    tiled_targets = tf.tile(target_nums[:, np.newaxis, -1], (1, recall_duration))
     loss_cls = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=tiled_targets,
                                                                          logits=output_logits))
     y_predict = tf.argmax(tf.reduce_mean(output_logits, axis=1), axis=1)
