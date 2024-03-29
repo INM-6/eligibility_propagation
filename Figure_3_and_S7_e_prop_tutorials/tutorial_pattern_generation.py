@@ -311,12 +311,13 @@ for k_iter in range(FLAGS.n_iter):
         if FLAGS.do_plot:
             update_plot(results_values)
 
-plt.ioff()
-update_plot(results_values)
+if FLAGS.do_plot:
+    plt.ioff()
+    update_plot(results_values)
 
-fig, ax_res = plt.subplots()
-ax_res.plot(loss_list)
-ax_res.set_xlabel('iterations')
-ax_res.set_ylabel('mean square error')
+    fig, ax_res = plt.subplots()
+    ax_res.plot(loss_list)
+    ax_res.set_xlabel('iterations')
+    ax_res.set_ylabel('mean square error')
 
-plt.show()
+    plt.show()
