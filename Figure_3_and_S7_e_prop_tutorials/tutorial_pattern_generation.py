@@ -60,6 +60,7 @@ B_random_val = np.random.randn(FLAGS.n_rec, FLAGS.n_out) / np.sqrt(FLAGS.n_rec)
 
 # build the input pattern
 frozen_poisson_noise_input = np.random.rand(FLAGS.n_batch, FLAGS.seq_len, FLAGS.n_in) < dt * input_f0
+frozen_poisson_noise_input[0, 0, :] = 0
 input_spikes = tf.constant(frozen_poisson_noise_input, dtype=tf.float32)
 
 # build the output pattern (note that the [None,:] adds an extra dimension of size 1 to the tensor)

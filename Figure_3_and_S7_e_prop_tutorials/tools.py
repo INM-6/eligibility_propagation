@@ -94,6 +94,7 @@ def generate_click_task_data(random_state, batch_size, seq_len, n_neuron, recall
     # background noise
     input_spike_prob[:, :, 3*n_channel:] = f0/4.
     input_spikes = generate_poisson_noise_np(random_state, input_spike_prob, freezing_seed)
+    input_spikes[:, 0, :] = False
 
     # generate targets
     target_mask = np.zeros((batch_size, seq_len), dtype=np.bool)
