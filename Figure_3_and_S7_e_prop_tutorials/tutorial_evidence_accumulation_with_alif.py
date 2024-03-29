@@ -147,7 +147,7 @@ with tf.name_scope('RegularizationLoss'):
     if(FLAGS.f_regularization_type == "simple"):
         # For historical reason we often use this regularization,
         # but the other one is easier to implement in an "online" fashion by a single agent.
-        loss_reg_f = tf.reduce_sum(tf.square(av - regularization_f0) * regularization_coeff)
+        loss_reg_f = 0.5*tf.reduce_sum(tf.square(av - regularization_f0) * regularization_coeff)
     else:
         # Basically, we need to replace the average firing rate by a running average:
         shp = tf.shape(z)
