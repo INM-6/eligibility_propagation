@@ -267,6 +267,7 @@ for k_iter in range(FLAGS.n_iter):
 
     # train
     t0 = time()
+    loss_list.append(sess.run(loss))
     sess.run(train_step)
     t_train = time() - t0
 
@@ -289,7 +290,6 @@ for k_iter in range(FLAGS.n_iter):
 
         print('''Iteration {}, loss {:.3g} reg loss {:.3g}'''.format(k_iter, results_values['loss'],
                                                                      results_values['loss_reg']))
-        loss_list.append(results_values['loss'])
 
 
         def get_stats(v):
@@ -325,3 +325,5 @@ ax_res.set_xlabel('iterations')
 ax_res.set_ylabel('mean square error')
 
 plt.show()
+
+print(loss_list)

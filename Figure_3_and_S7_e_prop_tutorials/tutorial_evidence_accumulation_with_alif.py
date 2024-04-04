@@ -245,10 +245,12 @@ validation_loss_list = []
 validation_error_list = []
 training_time_list = []
 n_iter_list = []
+loss_list = []
 
 results_tensors = {
     'loss_recall': loss,
     'loss_reg': loss_reg_f,
+    'loss_cls': loss_cls,
     'recall_errors': recall_errors,
     'av': av,
     'regularization_coeff': regularization_coeff,
@@ -356,10 +358,11 @@ for k_iter in range(FLAGS.n_iter):
 
     if k_iter == FLAGS.n_iter - 1:
         n_iter_list.append(k_iter)
-        break
 
     # do train step
     train_dict = get_data_dict(random_state_1, FLAGS.n_batch)
+    results_current = sess.run(results_tensors, feed_dict=train_dict)
+    loss_list.append(float(results_current['loss_cls']))
     t0 = time()
     sess.run(train_step, feed_dict=train_dict)
     t_train = time() - t0
@@ -398,3 +401,5 @@ print('''Statistics on the test set average error {:.2g} +- {:.2g} (averaged ove
       .format(np.mean(test_errors), np.std(test_errors), FLAGS.n_batch))
 
 del sess
+
+print(loss_list)
