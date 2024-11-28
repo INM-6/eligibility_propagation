@@ -10,7 +10,6 @@ from time import time
 from models import exp_convolve, LightLIF, pseudo_derivative, shift_by_one_time_step, check_gradients, \
     sum_of_sines_target
 
-np.random.seed(seed=1)
 
 FLAGS = tf.app.flags.FLAGS
 ##
@@ -43,7 +42,9 @@ tf.app.flags.DEFINE_bool('gradient_check', True,
                          'verify that the gradients computed with e-prop match the gradients of BPTT')
 
 tf.app.flags.DEFINE_string('eprop_or_bptt', 'eprop', 'choose the learing rule, it should be `eprop` of `bptt`')
+tf.app.flags.DEFINE_integer('seed', 1, 'random seed')
 
+np.random.seed(seed=FLAGS.seed)
 # Experiment parameters
 dt = 1  # time step in ms
 input_f0 = FLAGS.f0 / 1000  # input firing rate in kHz in coherence with the usage of ms for time

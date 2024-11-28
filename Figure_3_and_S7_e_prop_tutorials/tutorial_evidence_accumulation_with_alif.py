@@ -11,9 +11,6 @@ import tensorflow as tf
 from tools import update_plot, generate_click_task_data
 from models import EligALIF, exp_convolve
 
-random_state_1 = np.random.RandomState(seed=1)
-random_state_2 = np.random.RandomState(seed=2)
-freezing_seed = None
 
 FLAGS = tf.app.flags.FLAGS
 start_time = datetime.datetime.now()
@@ -42,6 +39,11 @@ tf.app.flags.DEFINE_integer('reg_rate', 10, 'target firing rate for regularizati
 tf.app.flags.DEFINE_integer('n_ref', 5, 'Number of refractory steps [ms]')
 tf.app.flags.DEFINE_integer('dt', 1, 'Simulation time step [ms]')
 tf.app.flags.DEFINE_float('dampening_factor', 0.3, 'factor that controls amplitude of pseudoderivative')
+tf.app.flags.DEFINE_integer('seed', 1, 'random seed')
+
+random_state_1 = np.random.RandomState(seed=FLAGS.seed)
+random_state_2 = np.random.RandomState(seed=2)
+freezing_seed = None
 
 # other settings
 tf.app.flags.DEFINE_bool('do_plot', True, 'Perform plots')
