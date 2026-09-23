@@ -15,30 +15,26 @@ import json
 from pathlib import Path
 
 base_path = Path(__file__).parent
-with open(base_path / "config.json", "r") as f:
-    cfg = json.load(f)
+config_path =  base_path / "config.json"
+recordings_dir = base_path
 
-recordings_dir = (base_path / cfg["relative_path_recordings_dir"]).resolve()
-
-if cfg["delete_existing_recordings"] and recordings_dir.exists():
-    for f in recordings_dir.iterdir():
-        f.unlink()
+n_iter_test = 4
 
 FLAGS = tf.app.flags.FLAGS
 start_time = datetime.datetime.now()
 # training parameters
-tf.app.flags.DEFINE_integer('n_batch', cfg["batch_size"], 'batch size')
-tf.app.flags.DEFINE_integer('n_iter', cfg["n_iter_train"], 'total number of iterations')
+tf.app.flags.DEFINE_integer('n_batch', 64, 'batch size')
+tf.app.flags.DEFINE_integer('n_iter', 2000, 'total number of iterations')
 tf.app.flags.DEFINE_float('learning_rate', 0.005, 'Base learning rate.')
-tf.app.flags.DEFINE_float('stop_crit', cfg["stop_crit"], 'Stopping criterion. Stops training if error goes below this value')
+tf.app.flags.DEFINE_float('stop_crit', 0.07, 'Stopping criterion. Stops training if error goes below this value')
 tf.app.flags.DEFINE_integer('print_every', 10, 'Print every')
-tf.app.flags.DEFINE_integer('validate_every', cfg["validate_every"], 'validate every')
+tf.app.flags.DEFINE_integer('validate_every', 10, 'validate every')
 
 # training algorithm
-tf.app.flags.DEFINE_bool('eprop', cfg["eprop"], 'Use e-prop to train network (BPTT if false)')
+tf.app.flags.DEFINE_bool('eprop', False, 'Use e-prop to train network (BPTT if false)')
 tf.app.flags.DEFINE_string('eprop_impl', 'autodiff', '["autodiff", "hardcoded"] Use tensorflow for computing e-prop '
                                                      'updates or implement equations directly')
-tf.app.flags.DEFINE_string('feedback', cfg["feedback"], '["random", "symmetric"] Use random or symmetric e-prop')
+tf.app.flags.DEFINE_string('feedback', 'symmetric', '["random", "symmetric"] Use random or symmetric e-prop')
 tf.app.flags.DEFINE_string('f_regularization_type', 'simple', '["simple", "online"] Twos types of firing rate regularization.')
 
 # neuron model and simulation parameters
@@ -51,18 +47,44 @@ tf.app.flags.DEFINE_integer('reg_rate', 10, 'target firing rate for regularizati
 tf.app.flags.DEFINE_integer('n_ref', 5, 'Number of refractory steps [ms]')
 tf.app.flags.DEFINE_integer('dt', 1, 'Simulation time step [ms]')
 tf.app.flags.DEFINE_float('dampening_factor', 0.3, 'factor that controls amplitude of pseudoderivative')
-tf.app.flags.DEFINE_integer('seed', cfg["seed"], 'random seed')
+tf.app.flags.DEFINE_integer('seed', 1, 'random seed')
 
 random_state_1 = np.random.RandomState(seed=FLAGS.seed)
 random_state_2 = np.random.RandomState(seed=2)
 freezing_seed = None
 
 # other settings
-tf.app.flags.DEFINE_bool('do_plot', cfg["do_plotting"], 'Perform plots')
+tf.app.flags.DEFINE_bool('do_plot', True, 'Perform plots')
 tf.app.flags.DEFINE_bool('device_placement', False, '')
 
 assert FLAGS.eprop_impl in ['autodiff', 'hardcoded']
 assert FLAGS.feedback in ['random', 'symmetric']
+
+if config_path.exists():
+    with open(config_path, "r") as f:
+        cfg = json.load(f)
+
+    recordings_dir = (base_path / cfg["relative_path_recordings_dir"]).resolve()
+
+    if cfg.get("delete_existing_recordings", False) and recordings_dir.exists():
+        for f in recordings_dir.iterdir():
+            f.unlink()
+
+    mappings = dict(
+        batch_size="n_batch",
+        do_plotting="do_plot",
+        n_iter="n_iter_train",
+        n_iter_train="n_iter",
+
+    )
+
+    for k, v in cfg.items():
+        if k in FLAGS:
+            setattr(FLAGS, k, v)
+        if k in mappings:
+            setattr(FLAGS, mappings[k], v)
+        
+    n_iter_test = cfg["n_iter_test"]
 
 # Experiment parameters
 t_cue_spacing = 150  # distance between two consecutive cues in ms
@@ -402,7 +424,7 @@ results = {
 
 # Save sample trajectory (input, output, etc. for plotting) and test final performance
 test_errors = []
-for i in range(cfg["n_iter_test"]):
+for i in range(n_iter_test):
     test_dict = get_data_dict(random_state_1, FLAGS.n_batch)
     results_values, plot_results_values, in_spk, spk, target_nums_np = sess.run(
         [results_tensors, plot_result_tensors, input_spikes, z, target_nums],
