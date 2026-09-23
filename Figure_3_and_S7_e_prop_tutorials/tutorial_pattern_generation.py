@@ -10,6 +10,18 @@ from time import time
 from models import exp_convolve, LightLIF, pseudo_derivative, shift_by_one_time_step, check_gradients, \
     sum_of_sines_target
 
+import json
+from pathlib import Path
+
+base_path = Path(__file__).parent
+with open(base_path / "config.json", "r") as f:
+    cfg = json.load(f)
+
+recordings_dir = (base_path / cfg["relative_path_recordings_dir"]).resolve()
+
+if cfg["delete_existing_recordings"] and recordings_dir.exists():
+    for f in recordings_dir.iterdir():
+        f.unlink()
 
 FLAGS = tf.app.flags.FLAGS
 ##
@@ -22,9 +34,9 @@ tf.app.flags.DEFINE_integer('n_rec', 100, 'number of recurrent units')
 tf.app.flags.DEFINE_integer('f0', 50, 'input firing rate')
 tf.app.flags.DEFINE_integer('reg_rate', 10, 'target rate for regularization')
 
-tf.app.flags.DEFINE_integer('n_iter', 2000, 'number of iterations')
+tf.app.flags.DEFINE_integer('n_iter', cfg["n_iter_train"], 'number of iterations')
 tf.app.flags.DEFINE_integer('seq_len', 1000, 'number of time steps per sequence')
-tf.app.flags.DEFINE_integer('print_every', 10, 'print statistics every K iterations')
+tf.app.flags.DEFINE_integer('print_every', cfg["print_every"], 'print statistics every K iterations')
 
 tf.app.flags.DEFINE_float('dampening_factor', 0.3, 'dampening factor to stabilize learning in RNNs')
 tf.app.flags.DEFINE_float('learning_rate', 1e-4, 'learning rate')
@@ -42,7 +54,7 @@ tf.app.flags.DEFINE_bool('gradient_check', True,
                          'verify that the gradients computed with e-prop match the gradients of BPTT')
 
 tf.app.flags.DEFINE_string('eprop_or_bptt', 'eprop', 'choose the learing rule, it should be `eprop` of `bptt`')
-tf.app.flags.DEFINE_integer('seed', 1, 'random seed')
+tf.app.flags.DEFINE_integer('seed', cfg["seed"], 'random seed')
 
 np.random.seed(seed=FLAGS.seed)
 # Experiment parameters
@@ -317,6 +329,11 @@ for k_iter in range(FLAGS.n_iter):
         if FLAGS.do_plot:
             update_plot(results_values)
 
+with open(recordings_dir / "learning_performance.csv", "w") as f:
+    f.write("iteration,phase,loss\n")
+    for i, loss in enumerate(loss_list):
+        f.write(f"{i},training,{loss}\n")
+
 plt.ioff()
 update_plot(results_values)
 
@@ -326,5 +343,3 @@ ax_res.set_xlabel('iterations')
 ax_res.set_ylabel('mean square error')
 
 plt.show()
-
-print(loss_list)

@@ -11,22 +11,34 @@ import tensorflow as tf
 from tools import update_plot, generate_click_task_data
 from models import EligALIF, exp_convolve
 
+import json
+from pathlib import Path
+
+base_path = Path(__file__).parent
+with open(base_path / "config.json", "r") as f:
+    cfg = json.load(f)
+
+recordings_dir = (base_path / cfg["relative_path_recordings_dir"]).resolve()
+
+if cfg["delete_existing_recordings"] and recordings_dir.exists():
+    for f in recordings_dir.iterdir():
+        f.unlink()
 
 FLAGS = tf.app.flags.FLAGS
 start_time = datetime.datetime.now()
 # training parameters
-tf.app.flags.DEFINE_integer('n_batch', 64, 'batch size')
-tf.app.flags.DEFINE_integer('n_iter', 2000, 'total number of iterations')
+tf.app.flags.DEFINE_integer('n_batch', cfg["batch_size"], 'batch size')
+tf.app.flags.DEFINE_integer('n_iter', cfg["n_iter_train"], 'total number of iterations')
 tf.app.flags.DEFINE_float('learning_rate', 0.005, 'Base learning rate.')
-tf.app.flags.DEFINE_float('stop_crit', 0.07, 'Stopping criterion. Stops training if error goes below this value')
+tf.app.flags.DEFINE_float('stop_crit', cfg["stop_crit"], 'Stopping criterion. Stops training if error goes below this value')
 tf.app.flags.DEFINE_integer('print_every', 10, 'Print every')
-tf.app.flags.DEFINE_integer('validate_every', 10, 'validate every')
+tf.app.flags.DEFINE_integer('validate_every', cfg["validate_every"], 'validate every')
 
 # training algorithm
-tf.app.flags.DEFINE_bool('eprop', False, 'Use e-prop to train network (BPTT if false)')
+tf.app.flags.DEFINE_bool('eprop', cfg["eprop"], 'Use e-prop to train network (BPTT if false)')
 tf.app.flags.DEFINE_string('eprop_impl', 'autodiff', '["autodiff", "hardcoded"] Use tensorflow for computing e-prop '
                                                      'updates or implement equations directly')
-tf.app.flags.DEFINE_string('feedback', 'symmetric', '["random", "symmetric"] Use random or symmetric e-prop')
+tf.app.flags.DEFINE_string('feedback', cfg["feedback"], '["random", "symmetric"] Use random or symmetric e-prop')
 tf.app.flags.DEFINE_string('f_regularization_type', 'simple', '["simple", "online"] Twos types of firing rate regularization.')
 
 # neuron model and simulation parameters
@@ -39,14 +51,14 @@ tf.app.flags.DEFINE_integer('reg_rate', 10, 'target firing rate for regularizati
 tf.app.flags.DEFINE_integer('n_ref', 5, 'Number of refractory steps [ms]')
 tf.app.flags.DEFINE_integer('dt', 1, 'Simulation time step [ms]')
 tf.app.flags.DEFINE_float('dampening_factor', 0.3, 'factor that controls amplitude of pseudoderivative')
-tf.app.flags.DEFINE_integer('seed', 1, 'random seed')
+tf.app.flags.DEFINE_integer('seed', cfg["seed"], 'random seed')
 
 random_state_1 = np.random.RandomState(seed=FLAGS.seed)
 random_state_2 = np.random.RandomState(seed=2)
 freezing_seed = None
 
 # other settings
-tf.app.flags.DEFINE_bool('do_plot', True, 'Perform plots')
+tf.app.flags.DEFINE_bool('do_plot', cfg["do_plotting"], 'Perform plots')
 tf.app.flags.DEFINE_bool('device_placement', False, '')
 
 assert FLAGS.eprop_impl in ['autodiff', 'hardcoded']
@@ -248,6 +260,9 @@ validation_error_list = []
 training_time_list = []
 n_iter_list = []
 loss_list = []
+phases = []
+losses = []
+errors = []
 
 results_tensors = {
     'loss_recall': loss,
@@ -365,6 +380,9 @@ for k_iter in range(FLAGS.n_iter):
     train_dict = get_data_dict(random_state_1, FLAGS.n_batch)
     results_current = sess.run(results_tensors, feed_dict=train_dict)
     loss_list.append(float(results_current['loss_cls']))
+    phases.append("training")
+    losses.append(float(results_current['loss_cls']))
+    errors.append(float(results_current['recall_errors']))
     t0 = time()
     sess.run(train_step, feed_dict=train_dict)
     t_train = time() - t0
@@ -384,12 +402,15 @@ results = {
 
 # Save sample trajectory (input, output, etc. for plotting) and test final performance
 test_errors = []
-for i in range(4):
+for i in range(cfg["n_iter_test"]):
     test_dict = get_data_dict(random_state_1, FLAGS.n_batch)
     results_values, plot_results_values, in_spk, spk, target_nums_np = sess.run(
         [results_tensors, plot_result_tensors, input_spikes, z, target_nums],
         feed_dict=test_dict)
     test_errors.append(results_values['recall_errors'])
+    phases.append("test")
+    losses.append(results_values["loss_cls"])
+    errors.append(results_values["recall_errors"])
     flag_dict['n_regular'] = n_regular
     plot_results_values['flags'] = flag_dict
 
@@ -404,4 +425,7 @@ print('''Statistics on the test set average error {:.2g} +- {:.2g} (averaged ove
 
 del sess
 
-print(loss_list)
+with open(recordings_dir / "learning_performance.csv", "w") as f:
+    f.write("iteration,phase,loss,error\n")
+    for i, (phase, loss, error) in enumerate(zip(phases, losses, errors)):
+        f.write(f"{i},{phase},{loss},{error}\n")
